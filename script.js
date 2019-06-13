@@ -52,6 +52,12 @@ if (!ext.supportLinearFiltering)
     config.BLOOM = false;
 }
 
+/*
+ * PM5 monitor stuff.
+ */
+let connectPM5Button;       // visual interface for connect / disconnect
+let PM5 = new Monitor();    // interface for talking with PM5
+
 startGUI();
 
 function getWebGLContext (canvas) {
@@ -92,10 +98,12 @@ function getWebGLContext (canvas) {
         formatR = getSupportedFormat(gl, gl.RGBA, gl.RGBA, halfFloatTexType);
     }
 
+    /*
     if (formatRGBA == null)
         ga('send', 'event', isWebGL2 ? 'webgl2' : 'webgl', 'not supported');
     else
         ga('send', 'event', isWebGL2 ? 'webgl2' : 'webgl', 'supported');
+    */
 
     return {
         gl,
@@ -149,20 +157,62 @@ function supportRenderTextureFormat (gl, internalFormat, format, type) {
     return true;
 }
 
+/*
+ * StrokeState:
+ * 0: Waiting to reach min speed
+ * 1: Waiting to accelerate
+ * 2: Driving
+ * 3: Dwelling after drive
+ * 4: Recovery
+ */
+let messagePM5 = function(o) {
+    if (o.data.hasOwnProperty('strokeState') && o.data.strokeState == 3) {
+        splatStack.push(parseInt(Math.random() * 20) + 5);
+    }
+};
+
+let disconnectPM5 = function() {
+    console.log('disconnectPM5');
+
+    PM5 = new Monitor();
+};
+
+function connectPM5() {
+     PM5.connect()
+     .then(() => {
+         return PM5.addEventListener('multiplexed-information', messagePM5)
+         .then(() => {
+             return PM5.addEventListener('disconnect', disconnectPM5);
+         })
+         .catch(error => {
+             console.log(error);
+         });
+     })
+     .catch(error => {
+         console.log(error);
+     });
+}
+
 function startGUI () {
     var gui = new dat.GUI({ width: 300 });
-    gui.add(config, 'SIM_RESOLUTION', { '32': 32, '64': 64, '128': 128, '256': 256 }).name('sim resolution').onFinishChange(initFramebuffers);
-    gui.add(config, 'DYE_RESOLUTION', { '128': 128, '256': 256, '512': 512, '1024': 1024 }).name('dye resolution').onFinishChange(initFramebuffers);
-    gui.add(config, 'DENSITY_DISSIPATION', 0.9, 1.0).name('density diffusion');
-    gui.add(config, 'VELOCITY_DISSIPATION', 0.9, 1.0).name('velocity diffusion');
-    gui.add(config, 'PRESSURE_DISSIPATION', 0.0, 1.0).name('pressure diffusion');
-    gui.add(config, 'CURL', 0, 50).name('vorticity').step(1);
-    gui.add(config, 'SPLAT_RADIUS', 0.01, 1.0).name('splat radius');
-    gui.add(config, 'SHADING').name('shading');
-    gui.add(config, 'COLORFUL').name('colorful');
-    gui.add(config, 'PAUSED').name('paused').listen();
 
-    gui.add({ fun: () => {
+    let concept2Folder = gui.addFolder('Concept2');
+    connectPM5Button = { add: connectPM5 };
+    concept2Folder.add(connectPM5Button, 'add').name('Connect to PM5');
+    concept2Folder.open();
+
+    let controlsFolder = gui.addFolder('Controls');
+    controlsFolder.add(config, 'SIM_RESOLUTION', { '32': 32, '64': 64, '128': 128, '256': 256 }).name('sim resolution').onFinishChange(initFramebuffers);
+    controlsFolder.add(config, 'DYE_RESOLUTION', { '128': 128, '256': 256, '512': 512, '1024': 1024 }).name('dye resolution').onFinishChange(initFramebuffers);
+    controlsFolder.add(config, 'DENSITY_DISSIPATION', 0.9, 1.0).name('density diffusion');
+    controlsFolder.add(config, 'VELOCITY_DISSIPATION', 0.9, 1.0).name('velocity diffusion');
+    controlsFolder.add(config, 'PRESSURE_DISSIPATION', 0.0, 1.0).name('pressure diffusion');
+    controlsFolder.add(config, 'CURL', 0, 50).name('vorticity').step(1);
+    controlsFolder.add(config, 'SPLAT_RADIUS', 0.01, 1.0).name('splat radius');
+    controlsFolder.add(config, 'SHADING').name('shading');
+    controlsFolder.add(config, 'COLORFUL').name('colorful');
+    controlsFolder.add(config, 'PAUSED').name('paused').listen();
+    controlsFolder.add({ fun: () => {
         splatStack.push(parseInt(Math.random() * 20) + 5);
     } }, 'fun').name('Random splats');
 
@@ -176,45 +226,16 @@ function startGUI () {
     captureFolder.add(config, 'TRANSPARENT').name('transparent');
     captureFolder.add({ fun: captureScreenshot }, 'fun').name('take screenshot');
 
-    let github = gui.add({ fun : () => {
-        window.open('https://github.com/PavelDoGreat/WebGL-Fluid-Simulation');
-        ga('send', 'event', 'link button', 'github');
+    let linkFolder = gui.addFolder('Links');
+    let github = linkFolder.add({ fun : () => {
+        window.open('https://github.com/ergarcade/WebGL-Fluid-Simulation');
+        //ga('send', 'event', 'link button', 'github');
     } }, 'fun').name('Github');
     github.__li.className = 'cr function bigFont';
     github.__li.style.borderLeft = '3px solid #8C8C8C';
     let githubIcon = document.createElement('span');
     github.domElement.parentElement.appendChild(githubIcon);
     githubIcon.className = 'icon github';
-
-    let twitter = gui.add({ fun : () => {
-        ga('send', 'event', 'link button', 'twitter');
-        window.open('https://twitter.com/PavelDoGreat');
-    } }, 'fun').name('Twitter');
-    twitter.__li.className = 'cr function bigFont';
-    twitter.__li.style.borderLeft = '3px solid #8C8C8C';
-    let twitterIcon = document.createElement('span');
-    twitter.domElement.parentElement.appendChild(twitterIcon);
-    twitterIcon.className = 'icon twitter';
-
-    let discord = gui.add({ fun : () => {
-        ga('send', 'event', 'link button', 'discord');
-        window.open('https://discordapp.com/invite/CeqZDDE');
-    } }, 'fun').name('Discord');
-    discord.__li.className = 'cr function bigFont';
-    discord.__li.style.borderLeft = '3px solid #8C8C8C';
-    let discordIcon = document.createElement('span');
-    discord.domElement.parentElement.appendChild(discordIcon);
-    discordIcon.className = 'icon discord';
-
-    let app = gui.add({ fun : () => {
-        ga('send', 'event', 'link button', 'app');
-        window.open('http://onelink.to/5b58bn');
-    } }, 'fun').name('Check out new improved version');
-    app.__li.className = 'cr function appBigFont';
-    app.__li.style.borderLeft = '3px solid #00FF7F';
-    let appIcon = document.createElement('span');
-    app.domElement.parentElement.appendChild(appIcon);
-    appIcon.className = 'icon app';
 
     if (isMobile())
         gui.close();
