@@ -55,8 +55,9 @@ if (!ext.supportLinearFiltering)
 /*
  * PM5 monitor stuff.
  */
-let connectPM5Button;       // visual interface for connect / disconnect
 let PM5 = new Monitor();    // interface for talking with PM5
+let buttonState;
+
 
 startGUI();
 
@@ -188,15 +189,24 @@ let messagePM5 = function(o) {
     }
 };
 
-let disconnectPM5 = function() {
-    console.log('disconnectPM5');
 
+function disconnectPM5() {
+    buttonState.name('Connect PM5');
+    let b = { add: connectPM5 };
+    buttonState.object = b;
+
+    PM5.disconnect();
     PM5 = new Monitor();
-};
+}
 
 function connectPM5() {
      PM5.connect()
      .then(() => {
+         buttonState.name('Disconnect PM5');
+         let b = { add: disconnectPM5 };
+         buttonState.object = b;
+
+         splatStack.push(parseInt(Math.random() * 20) + 5);
          return PM5.addEventListener('general-status', messagePM5)
          .then(() => {
              return PM5.addEventListener('disconnect', disconnectPM5);
@@ -214,8 +224,8 @@ function startGUI () {
     var gui = new dat.GUI({ width: 300 });
 
     let concept2Folder = gui.addFolder('Concept2');
-    connectPM5Button = { add: connectPM5 };
-    concept2Folder.add(connectPM5Button, 'add').name('Connect to PM5');
+    let connectPM5Button = { add: connectPM5 };
+    buttonState = concept2Folder.add(connectPM5Button, 'add').name('Connect PM5');
     concept2Folder.open();
 
     let controlsFolder = gui.addFolder('Controls');
