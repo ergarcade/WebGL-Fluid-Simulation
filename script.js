@@ -159,15 +159,32 @@ function supportRenderTextureFormat (gl, internalFormat, format, type) {
 
 /*
  * StrokeState:
- * 0: Waiting to reach min speed
- * 1: Waiting to accelerate
- * 2: Driving
- * 3: Dwelling after drive
- * 4: Recovery
+ * - 0: Waiting to reach min speed
+ * - 1: Waiting to accelerate
+ * - 2: Driving
+ * - 3: Dwelling after drive
+ * - 4: Recovery
  */
+const STROKESTATE_WAITING_MIN_SPEED = 0;
+const STROKESTATE_WAITING_ACCELERATE = 1;
+const STROKESTATE_DRIVING = 2;
+const STROKESTATE_DWELLING = 3;
+const STROKESTATE_RECOVERY = 4;
+
+let lastStrokeState = 0;
 let messagePM5 = function(o) {
-    if (o.data.hasOwnProperty('strokeState') && o.data.strokeState == 3) {
-        splatStack.push(parseInt(Math.random() * 20) + 5);
+    if (o.data.hasOwnProperty('strokeState')) {
+        //console.log("last state: " + lastStrokeState + " - current state: " + o.data.strokeState);
+
+        /*
+         * Only at commencement of stroke.
+         */
+        if (o.data.strokeState == STROKESTATE_DRIVING && lastStrokeState != STROKESTATE_DRIVING) {
+            //console.log('stroke');
+            splatStack.push(parseInt(Math.random() * 20) + 5);
+        }
+
+        lastStrokeState = o.data.strokeState;
     }
 };
 
@@ -180,7 +197,7 @@ let disconnectPM5 = function() {
 function connectPM5() {
      PM5.connect()
      .then(() => {
-         return PM5.addEventListener('multiplexed-information', messagePM5)
+         return PM5.addEventListener('general-status', messagePM5)
          .then(() => {
              return PM5.addEventListener('disconnect', disconnectPM5);
          })
