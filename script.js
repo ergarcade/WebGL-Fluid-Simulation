@@ -223,10 +223,15 @@ function connectPM5() {
 function startGUI () {
     var gui = new dat.GUI({ width: 300 });
 
-    let concept2Folder = gui.addFolder('Concept2');
-    let connectPM5Button = { add: connectPM5 };
-    buttonState = concept2Folder.add(connectPM5Button, 'add').name('Connect PM5');
-    concept2Folder.open();
+    if (navigator.bluetooth) {
+        let concept2Folder = gui.addFolder('Concept2');
+        let connectPM5Button = { add: connectPM5 };
+        buttonState = concept2Folder.add(connectPM5Button, 'add').name('Connect PM5');
+        concept2Folder.open();
+    } else {
+        alert("Your browser does not support Web Bluetooth! " +
+            "PM5 functionality only works with Chrome on the desktop.");
+    }
 
     let controlsFolder = gui.addFolder('Controls');
     controlsFolder.add(config, 'SIM_RESOLUTION', { '32': 32, '64': 64, '128': 128, '256': 256 }).name('sim resolution').onFinishChange(initFramebuffers);
